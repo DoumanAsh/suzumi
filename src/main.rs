@@ -1,3 +1,5 @@
+mod assets;
+
 fn main() {
-    println!("Hello, world!");
+    let assets = assets::Assets::new();
 }
