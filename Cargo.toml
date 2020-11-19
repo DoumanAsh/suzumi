@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 arg = "0.3"
 c-ffi = "0.4"
+str-buf = "1"
 
 [dependencies.rogu]
 version = "0.2"
