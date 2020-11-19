@@ -14,19 +14,11 @@ pub trait Deserialize: Serialize {
 
 #[derive(Debug, Default)]
 pub struct Server {
-    welcome_ch: u64,
-    music_ch: u64,
+    pub welcome_ch: u64,
+    pub music_ch: u64,
 }
 
 impl Server {
-    pub const fn new() -> Self {
-        Self {
-            welcome_ch: 0,
-            music_ch: 0,
-        }
-    }
-
-
     #[inline]
     pub const fn from_bytes(data: &<Self as Serialize>::Output) -> Self {
         Self {
@@ -80,8 +72,8 @@ impl Deserialize for Server {
 
 #[derive(Debug)]
 pub struct User {
-    cash: u32,
-    exp: u32,
+    pub cash: u32,
+    pub exp: u32,
 }
 
 impl User {

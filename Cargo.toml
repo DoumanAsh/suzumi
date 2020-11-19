@@ -14,6 +14,17 @@ str-buf = "1"
 version = "0.2"
 features = ["std", "release_level_info_off", "release_level_debug_off", "release_level_trace_off"]
 
+# discord
+[dependencies.serenity]
+version = "0.9"
+default-features = false
+features = ["builder", "client", "model", "rustls_backend", "http", "gateway", "cache", "voice"]
+
+[dependencies.tokio]
+version = "0.2"
+default-features = false
+features = ["rt-core", "io-driver", "macros"]
+
 # Image processing
 [dependencies.rusttype]
 version  = "0.9"

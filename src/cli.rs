@@ -2,11 +2,11 @@ use arg::Args;
 
 use core::str::FromStr;
 
-type TokenStr = str_buf::StrBuf<[u8; 59]>;
+pub type TokenStr = str_buf::StrBuf<[u8; 59]>;
 
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct Token(TokenStr);
+pub struct Token(pub TokenStr);
 
 impl FromStr for Token {
     type Err = ();

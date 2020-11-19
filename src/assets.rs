@@ -1,5 +1,6 @@
 use core::cmp;
 
+#[derive(Clone)]
 pub struct Img {
     pub welcome: image::DynamicImage,
 }
@@ -15,6 +16,7 @@ impl Img {
     }
 }
 
+#[derive(Clone)]
 pub struct Font {
     pub welcome: rusttype::Font<'static>
 }
@@ -30,6 +32,7 @@ impl Font {
     }
 }
 
+#[derive(Clone)]
 pub struct Assets {
     pub img: Img,
     pub font: Font,
