@@ -6,7 +6,16 @@ edition = "2018"
 publish = false
 
 [dependencies]
-rusttype = "0.9"
+arg = "0.3"
+c-ffi = "0.4"
+
+[dependencies.rogu]
+version = "0.2"
+features = ["std", "release_level_info_off", "release_level_debug_off", "release_level_trace_off"]
+
+# Image processing
+[dependencies.rusttype]
+version  = "0.9"
 
 [dependencies.image]
 version = "0.23"
@@ -16,6 +25,12 @@ features = ["png"]
 [dependencies.imageproc]
 version = "0.22"
 default-features = false
+
+# DB
+[dependencies.sled]
+version = "0.34"
+default-features = false
+features = ["no_logs", "no_metrics"]
 
 [profile.release]
 lto = true
