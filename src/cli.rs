@@ -27,6 +27,9 @@ pub struct Cli {
     #[arg(long, short, required)]
     ///Discord token to use. Must be a string of 59 characters.
     pub token: Token,
+    #[arg(long, short, default_value = "'.'")]
+    ///Command prefix. Default is '.'.
+    pub prefix: char,
 }
 
 impl Cli {

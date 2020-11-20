@@ -9,6 +9,11 @@ publish = false
 arg = "0.3"
 c-ffi = "0.4"
 str-buf = "1"
+cute-dnd-dice = "4"
+
+[dependencies.xxhash-rust]
+version = "0.8.0-beta.5"
+features = ["xxh3", "const_xxh3"]
 
 [dependencies.rogu]
 version = "0.2"

@@ -5,10 +5,13 @@ use suzumi::*;
 c_ffi::c_main!(rust_main);
 
 fn rust_main(args: c_ffi::Args) -> u8 {
+
     let args = match cli::Cli::new(args.into_iter().skip(1)) {
         Ok(args) => args,
         Err(code) => return code,
     };
+
+    rogu::set_level(rogu::Level::TRACE);
 
     let db = match db::Db::open("suzumi-db") {
         Ok(db) => db,
@@ -20,7 +23,7 @@ fn rust_main(args: c_ffi::Args) -> u8 {
 
     let assets = assets::Assets::new();
 
-    let mut rt = match tokio::runtime::Builder::new().basic_scheduler().enable_io().max_threads(8).build() {
+    let mut rt = match tokio::runtime::Builder::new().basic_scheduler().enable_io().enable_time().max_threads(8).build() {
         Ok(rt) => rt,
         Err(error) => {
             eprintln!("Unable to start IO loop: {}", error);
