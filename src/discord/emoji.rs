@@ -1,2 +1,2 @@
 pub const OK: char = '👌';
-pub const KINSHI: char = '👌';
+pub const KINSHI: char = '🚫';
