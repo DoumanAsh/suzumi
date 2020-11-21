@@ -1,4 +1,5 @@
 use super::*;
+use crate::game::Level;
 
 use core::fmt;
 
@@ -36,9 +37,11 @@ impl super::Handler {
                 let result = ctx.msg.author.direct_message(&ctx, |m| {
                     m.embed(|m| {
 
+                        let level = Level::new(user.exp);
                         m.title("Profile")
-                            .field("Cash", user.cash, true)
-                            .field("Exp", user.exp, true)
+                            .field("Level", level.level, true)
+                            .field("Exp", level, true)
+                            .field("Cash", user.cash, false)
                             .field("Moderator:", ctx.is_mod, false)
                     })
                 }).await;

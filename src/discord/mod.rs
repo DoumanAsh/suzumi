@@ -3,15 +3,17 @@ use serenity::model::prelude::{Ready, Message, Guild, GuildUnavailable, GuildId,
 use serenity::client::Context;
 use serenity::model::misc::Mentionable;
 
-use crate::data;
+use crate::{game, data};
 use crate::assets::Assets;
 use crate::db::DbView;
 use crate::utils::OptionExt;
 
+use core::fmt;
 use std::collections::{HashMap, HashSet};
 
 const CMD_HELP_TXT: &str = include_str!("../../HELP.md");
 
+mod utils;
 mod commands;
 mod emoji;
 
@@ -33,6 +35,7 @@ struct State {
     assets: Assets,
 }
 
+//Discord state and handler, which processes incoming messages.
 struct Handler {
     state: State,
     mods: tokio::sync::RwLock<HashSet<u64>>,
@@ -80,6 +83,40 @@ impl Handler {
         false
     }
 
+    async fn handle_chat(&self, ctx: HandlerContext<'_>) -> serenity::Result<()> {
+        struct LevelUpCong(u8);
+
+        impl fmt::Display for LevelUpCong {
+            #[inline]
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "Congratulations on level up! Your new level is {}", self.0)
+            }
+        }
+
+        let mut user: data::User = match self.state.db.get(ctx.msg.author.id.0) {
+            Ok(user) => user,
+            Err(error) => {
+                rogu::error!("Unable to get user data: {}", error);
+                return Ok(())
+            }
+        };
+
+        let mut level = game::Level::new(user.exp);
+        let result = level.add_for(ctx.msg);
+        if result == game::LevelAddResult::Maxed {
+            return Ok(())
+        }
+
+        user.exp = level.exp;
+        self.state.db.put(ctx.msg.author.id.0, &user);
+
+        if result == game::LevelAddResult::LevelUp {
+            ctx.msg.reply(ctx, LevelUpCong(level.level)).await.map(|_| ())
+        } else {
+            Ok(())
+        }
+    }
+
     async fn handle_cmd(&self, ctx: HandlerContext<'_>) -> serenity::Result<()> {
         use commands::*;
 
@@ -98,7 +135,7 @@ impl Handler {
     }
 }
 
-///Discord event handler, contains state which is thread safe.
+///Discord wrapper
 pub struct Discord {
     state: State,
     config: Config,
@@ -164,7 +201,8 @@ impl Discord {
 #[async_trait]
 impl serenity::client::EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
-        if msg.author.bot {
+        //Ignore messages from bots and any non-chatter
+        if msg.author.bot || msg.kind != serenity::model::channel::MessageType::Regular {
             return;
         }
 
@@ -187,29 +225,34 @@ impl serenity::client::EventHandler for Handler {
             self.handle_cmd(context).await
         } else {
             if !content.starts_with(self.config.prefix) {
-                //TODO: handle non-commands
-                return;
+                let context = HandlerContext {
+                    serenity: &ctx,
+                    msg: &msg,
+                    text: content,
+                    //we do not care if chat is from moderator or not, at least for now
+                    is_mod: false,
+                };
+                self.handle_chat(context).await
+            } else {
+                let content = content.trim_start_matches(self.config.prefix);
+
+                let is_mod = match msg.member(&ctx.http).await {
+                    Ok(member) => self.is_moderator(&member.roles).await,
+                    Err(error) => {
+                        //It is supposed to fail when message is DM, but we handle DM differently
+                        rogu::warn!("Member info is unavailable, cannot determine moderator status. Error: {}", error);
+                        false
+                    }
+                };
+
+                let context = HandlerContext {
+                    serenity: &ctx,
+                    msg: &msg,
+                    text: content,
+                    is_mod,
+                };
+                self.handle_cmd(context).await
             }
-
-            let content = content.trim_start_matches(self.config.prefix);
-
-            let is_mod = match msg.member(&ctx.http).await {
-                Ok(member) => self.is_moderator(&member.roles).await,
-                Err(error) => {
-                    //It is supposed to fail when message is DM, but we handle DM differently
-                    rogu::warn!("Member info is unavailable, cannot determine moderator status. Error: {}", error);
-                    false
-                }
-            };
-
-
-            let context = HandlerContext {
-                serenity: &ctx,
-                msg: &msg,
-                text: content,
-                is_mod,
-            };
-            self.handle_cmd(context).await
         };
 
         if let Err(error) = result {

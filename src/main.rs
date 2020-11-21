@@ -5,13 +5,12 @@ use suzumi::*;
 c_ffi::c_main!(rust_main);
 
 fn rust_main(args: c_ffi::Args) -> u8 {
-
     let args = match cli::Cli::new(args.into_iter().skip(1)) {
         Ok(args) => args,
         Err(code) => return code,
     };
 
-    rogu::set_level(rogu::Level::TRACE);
+    rogu::set_level(rogu::Level::DEBUG);
 
     let db = match db::Db::open("suzumi-db") {
         Ok(db) => db,
