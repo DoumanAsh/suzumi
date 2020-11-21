@@ -10,7 +10,10 @@ fn rust_main(args: c_ffi::Args) -> u8 {
         Err(code) => return code,
     };
 
+    #[cfg(debug_assertions)]
     rogu::set_level(rogu::Level::DEBUG);
+    #[cfg(not(debug_assertions))]
+    rogu::set_level(rogu::Level::INFO);
 
     let db = match db::Db::open("suzumi-db") {
         Ok(db) => db,

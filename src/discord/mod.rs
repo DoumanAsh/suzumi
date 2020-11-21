@@ -94,7 +94,8 @@ impl Handler {
             }
         }
 
-        let mut user: data::User = match self.state.db.get(ctx.msg.author.id.0) {
+        let id = ctx.msg.author.id.0;
+        let mut user: data::User = match self.state.db.get(id) {
             Ok(user) => user,
             Err(error) => {
                 rogu::error!("Unable to get user data: {}", error);
@@ -109,7 +110,8 @@ impl Handler {
         }
 
         user.exp = level.exp;
-        self.state.db.put(ctx.msg.author.id.0, &user);
+        let db = self.state.db.clone();
+        let _ = tokio::task::spawn_blocking(move || db.put(id, &user)).await;
 
         if result == game::LevelAddResult::LevelUp {
             ctx.msg.reply(ctx, LevelUpCong(level.level)).await.map(|_| ())
@@ -130,6 +132,7 @@ impl Handler {
             HELP => self.handle_help(ctx).await,
             ROLL => self.handle_roll(ctx).await.map(|_| ()),
             WHOAMI => self.handle_whoami(ctx).await,
+            CONFIG => self.handle_config(ctx).await,
             SET_WELCOME => self.handle_set_welcome(ctx).await,
             _ => ctx.msg.reply(ctx, "Sorry, I do not know such command").await.map(|_| ()),
         }
