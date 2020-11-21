@@ -44,7 +44,11 @@ impl Level {
 
     ///Calculate cash allowance
     pub const fn cash(&self) -> u32 {
-        self.level as u32 * 10
+        if self.level == 0 {
+            1
+        } else {
+            self.level as u32 * 10
+        }
     }
 
     #[inline]

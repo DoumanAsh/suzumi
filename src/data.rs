@@ -1,5 +1,7 @@
 //! Data types and serialization
 
+use core::time;
+
 pub trait Serialize {
     const SIZE: usize;
     //Generally should be static array;
@@ -74,6 +76,8 @@ impl Deserialize for Server {
 pub struct User {
     pub cash: u32,
     pub exp: u32,
+    //since epoch
+    pub last_allowance: time::Duration,
 }
 
 impl User {
@@ -82,6 +86,7 @@ impl User {
         Self {
             cash: 100,
             exp: 0,
+            last_allowance: time::Duration::from_secs(0),
         }
     }
 
@@ -90,6 +95,9 @@ impl User {
         Self {
             cash: u32::from_le_bytes([data[0], data[1], data[2], data[3]]),
             exp: u32::from_le_bytes([data[4], data[5], data[6], data[7]]),
+            last_allowance: time::Duration::from_secs(u64::from_le_bytes([
+                    data[8], data[9], data[10], data[11], data[12], data[13], data[14], data[15]
+            ])),
         }
     }
 
@@ -97,6 +105,7 @@ impl User {
     pub const fn to_bytes(&self) -> <Self as Serialize>::Output {
         let cash = self.cash.to_le_bytes();
         let exp = self.exp.to_le_bytes();
+        let last_allowance = self.last_allowance.as_secs().to_le_bytes();
 
         [
             cash[0],
@@ -107,13 +116,21 @@ impl User {
             exp[1],
             exp[2],
             exp[3],
+            last_allowance[0],
+            last_allowance[1],
+            last_allowance[2],
+            last_allowance[3],
+            last_allowance[4],
+            last_allowance[5],
+            last_allowance[6],
+            last_allowance[7],
         ]
     }
 }
 
 impl Serialize for User {
-    const SIZE: usize = 8;
-    type Output = [u8; 8];
+    const SIZE: usize = 16;
+    type Output = [u8; 16];
 
     #[inline]
     fn serialize(&self) -> Self::Output {

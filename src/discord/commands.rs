@@ -1,12 +1,24 @@
 use super::*;
 use crate::game::Level;
 
+use std::time;
 use core::fmt;
+
+///Seconds in day
+pub const DAY_SECONDS: u64 = 60 * 60 * 24;
+
+mod err {
+    pub mod discord {
+        pub const NO_USER_INFO: &str = "Cannot find your dossier :(";
+        pub const BROKEN_TIME: &str = "My watch is broken, cannot do it now";
+    }
+}
 
 pub const PING: u64 = xxhash_rust::const_xxh3::xxh3_64(b"ping");
 pub const HELP: u64 = xxhash_rust::const_xxh3::xxh3_64(b"help");
 pub const ROLL: u64 = xxhash_rust::const_xxh3::xxh3_64(b"roll");
 pub const WHOAMI: u64 = xxhash_rust::const_xxh3::xxh3_64(b"whoami");
+pub const ALLOWANCE: u64 = xxhash_rust::const_xxh3::xxh3_64(b"allowance");
 pub const SET_WELCOME: u64 = xxhash_rust::const_xxh3::xxh3_64(b"set_welcome");
 pub const CONFIG: u64 = xxhash_rust::const_xxh3::xxh3_64(b"config");
 
@@ -55,9 +67,56 @@ impl super::Handler {
             },
             Err(error) => {
                 rogu::error!("Unable to get user's info: {}", error);
-                ctx.msg.reply(ctx, "Cannot find information :(").await
+                ctx.msg.reply(ctx, err::discord::NO_USER_INFO).await
             },
         }?;
+
+        Ok(())
+    }
+
+    #[inline]
+    pub async fn handle_allowance(&self, ctx: HandlerContext<'_>) -> serenity::Result<()> {
+        struct Allowance(u32);
+        impl fmt::Display for Allowance {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "Your allowance is {}¥", self.0)
+            }
+        }
+
+        let id = ctx.msg.author.id.0;
+        match self.state.db.get::<data::User>(id) {
+            Ok(mut user) => match time::SystemTime::UNIX_EPOCH.checked_add(user.last_allowance) {
+                Some(before) => {
+                    let now = time::SystemTime::now();
+                    if let Ok(duration) = now.duration_since(before) {
+                        if duration.as_secs() >= DAY_SECONDS {
+                            let level = game::Level::new(user.exp);
+                            let allowance = level.cash();
+                            user.cash = user.cash.saturating_add(allowance);
+                            user.last_allowance = now.duration_since(time::SystemTime::UNIX_EPOCH).expect("Broken Time");
+
+                            let db = self.state.db.clone();
+                            let _ = tokio::task::spawn_blocking(move || db.put(id, &user)).await;
+
+                            ctx.msg.reply(&ctx, Allowance(allowance)).await?;
+                            return Ok(())
+                        }
+                    }
+                    //error case can only happen if for some reason now is in past
+
+                    let _ = ctx.msg.react(&ctx, emoji::KINSHI).await;
+                },
+                None => {
+                    //well I suppose we're too far in future so fix god damn system time
+                    rogu::error!("Time is broken");
+                    ctx.msg.reply(ctx, err::discord::BROKEN_TIME).await?;
+                }
+            },
+            Err(error) => {
+                rogu::error!("Unable to get user's info: {}", error);
+                ctx.msg.reply(ctx, err::discord::NO_USER_INFO).await?;
+            },
+        }
 
         Ok(())
     }

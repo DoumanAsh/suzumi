@@ -132,6 +132,7 @@ impl Handler {
             HELP => self.handle_help(ctx).await,
             ROLL => self.handle_roll(ctx).await.map(|_| ()),
             WHOAMI => self.handle_whoami(ctx).await,
+            ALLOWANCE => self.handle_allowance(ctx).await,
             CONFIG => self.handle_config(ctx).await,
             SET_WELCOME => self.handle_set_welcome(ctx).await,
             _ => ctx.msg.reply(ctx, "Sorry, I do not know such command").await.map(|_| ()),
