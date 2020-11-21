@@ -61,7 +61,11 @@ impl super::Handler {
     #[inline]
     pub async fn handle_help(&self, ctx: HandlerContext<'_>) -> serenity::Result<()> {
         let result = ctx.msg.author.direct_message(&ctx, |msg| {
-            msg.content(CMD_HELP_TXT)
+            if ctx.is_mod {
+                msg.content(format_args!("{}\n{}", CMD_HELP_TXT, MOD_CMD_HELP_TXT))
+            } else {
+                msg.content(CMD_HELP_TXT)
+            }
         }).await;
 
         match result {

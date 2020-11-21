@@ -12,6 +12,7 @@ use core::fmt;
 use std::collections::{HashMap, HashSet};
 
 const CMD_HELP_TXT: &str = include_str!("../../HELP.md");
+const MOD_CMD_HELP_TXT: &str = include_str!("../../MOD_HELP.md");
 
 mod utils;
 mod commands;
