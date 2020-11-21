@@ -130,7 +130,8 @@ impl Handler {
         match xxhash_rust::xxh3::xxh3_64(cmd.as_bytes()) {
             PING => ctx.msg.reply(ctx, "pong!").await.map(|_| ()),
             HELP => self.handle_help(ctx).await,
-            ROLL => self.handle_roll(ctx).await.map(|_| ()),
+            ROLL => self.handle_roll(ctx).await,
+            JUDGE => self.handle_judge(ctx, split.collect()).await,
             WHOAMI => self.handle_whoami(ctx).await,
             ALLOWANCE => self.handle_allowance(ctx).await,
             CONFIG => self.handle_config(ctx).await,

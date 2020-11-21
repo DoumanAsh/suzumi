@@ -4,8 +4,8 @@ use crate::game::Level;
 use std::time;
 use core::fmt;
 
-///Seconds in day
-pub const DAY_SECONDS: u64 = 60 * 60 * 24;
+///1h
+pub const ALLOWANCE_COOL_DOWN: u64 = 60 * 60;
 
 mod err {
     pub mod discord {
@@ -17,6 +17,7 @@ mod err {
 pub const PING: u64 = xxhash_rust::const_xxh3::xxh3_64(b"ping");
 pub const HELP: u64 = xxhash_rust::const_xxh3::xxh3_64(b"help");
 pub const ROLL: u64 = xxhash_rust::const_xxh3::xxh3_64(b"roll");
+pub const JUDGE: u64 = xxhash_rust::const_xxh3::xxh3_64(b"judge");
 pub const WHOAMI: u64 = xxhash_rust::const_xxh3::xxh3_64(b"whoami");
 pub const ALLOWANCE: u64 = xxhash_rust::const_xxh3::xxh3_64(b"allowance");
 pub const SET_WELCOME: u64 = xxhash_rust::const_xxh3::xxh3_64(b"set_welcome");
@@ -41,6 +42,22 @@ impl super::Handler {
 
         let roll = cute_dnd_dice::Roll::from_str(&ctx.text[4..]);
         ctx.msg.reply(ctx, Text(roll)).await?;
+        Ok(())
+    }
+
+    #[inline]
+    pub async fn handle_judge(&self, ctx: HandlerContext<'_>, args: Vec<&'_ str>) -> serenity::Result<()> {
+        if args.len() < 2 {
+            ctx.msg.reply(&ctx, "You need to give me at least two choices.").await?;
+            return Ok(())
+        }
+
+        let roll = cute_dnd_dice::Roll::new(1,
+                                            core::num::NonZeroU16::new(args.len() as u16).unwrap_certain(),
+                                            cute_dnd_dice::Modifier::Plus(0));
+        let choice = args[roll.roll() as usize - 1];
+
+        ctx.msg.reply(&ctx, format!("The criminal is {}", choice)).await?;
         Ok(())
     }
 
@@ -89,7 +106,7 @@ impl super::Handler {
                 Some(before) => {
                     let now = time::SystemTime::now();
                     if let Ok(duration) = now.duration_since(before) {
-                        if duration.as_secs() >= DAY_SECONDS {
+                        if duration.as_secs() >= ALLOWANCE_COOL_DOWN {
                             let level = game::Level::new(user.exp);
                             let allowance = level.cash();
                             user.cash = user.cash.saturating_add(allowance);
