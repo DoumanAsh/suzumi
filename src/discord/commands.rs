@@ -21,6 +21,7 @@ pub const ROLL: u64 = xxhash_rust::const_xxh3::xxh3_64(b"roll");
 pub const JUDGE: u64 = xxhash_rust::const_xxh3::xxh3_64(b"judge");
 pub const WHOAMI: u64 = xxhash_rust::const_xxh3::xxh3_64(b"whoami");
 pub const ALLOWANCE: u64 = xxhash_rust::const_xxh3::xxh3_64(b"allowance");
+pub const SHUTDOWN: u64 = xxhash_rust::const_xxh3::xxh3_64(b"shutdown");
 pub const SET_WELCOME: u64 = xxhash_rust::const_xxh3::xxh3_64(b"set_welcome");
 pub const CONFIG: u64 = xxhash_rust::const_xxh3::xxh3_64(b"config");
 
@@ -174,6 +175,21 @@ impl super::Handler {
                     let _ = ctx.msg.react(&ctx, emoji::OK).await;
                     return Ok(())
                 }
+            }
+        }
+
+        let _ = ctx.msg.react(&ctx, emoji::KINSHI).await;
+        Ok(())
+    }
+
+    #[inline]
+    pub async fn handle_shutdown(&self, ctx: HandlerContext<'_>) -> serenity::Result<()> {
+        if ctx.is_mod {
+            let data = ctx.serenity.data.read().await;
+            if let Some(manager) = data.get::<ShardManagerTag>() {
+                let _ = ctx.msg.react(&ctx, emoji::OK).await;
+                manager.lock().await.shutdown_all().await;
+                return Ok(());
             }
         }
 

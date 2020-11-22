@@ -1,7 +1,9 @@
 use serenity::async_trait; //they use this cancer :(
-use serenity::model::prelude::{Ready, Message, Guild, GuildUnavailable, GuildId, Member, ChannelId, PartialGuild, RoleId, Role};
 use serenity::client::Context;
 use serenity::model::misc::Mentionable;
+use serenity::prelude::{TypeMapKey};
+use serenity::client::bridge::gateway::ShardManager;
+use serenity::model::prelude::{Ready, Message, Guild, GuildUnavailable, GuildId, Member, ChannelId, PartialGuild, RoleId, Role};
 
 use crate::{game, data};
 use crate::assets::Assets;
@@ -13,6 +15,11 @@ use std::collections::{HashMap, HashSet};
 
 const CMD_HELP_TXT: &str = include_str!("../../HELP.md");
 const MOD_CMD_HELP_TXT: &str = include_str!("../../MOD_HELP.md");
+
+struct ShardManagerTag;
+impl TypeMapKey for ShardManagerTag {
+    type Value = std::sync::Arc<serenity::prelude::Mutex<ShardManager>>;
+}
 
 mod utils;
 mod commands;
@@ -41,7 +48,6 @@ struct Handler {
     state: State,
     mods: tokio::sync::RwLock<HashSet<u64>>,
     config: Config,
-    voice_manager: std::sync::Arc<serenity::prelude::Mutex<serenity::client::bridge::voice::ClientVoiceManager>>
 }
 
 pub struct HandlerContext<'a> {
@@ -134,6 +140,7 @@ impl Handler {
             JUDGE => self.handle_judge(ctx, split.collect()).await,
             WHOAMI => self.handle_whoami(ctx).await,
             ALLOWANCE => self.handle_allowance(ctx).await,
+            SHUTDOWN => self.handle_shutdown(ctx).await,
             CONFIG => self.handle_config(ctx).await,
             SET_WELCOME => self.handle_set_welcome(ctx).await,
             _ => ctx.msg.reply(ctx, "Sorry, I do not know such command").await.map(|_| ()),
@@ -178,26 +185,33 @@ impl Discord {
 
     pub async fn start(self) {
         loop {
-            let voice_manager = serenity::client::bridge::voice::ClientVoiceManager::new(1, self.state.info.id.into());
+            //let voice_manager = serenity::client::bridge::voice::ClientVoiceManager::new(1, self.state.info.id.into());
 
             let handler = Handler {
                 state: self.state.clone(),
                 mods: tokio::sync::RwLock::new(HashSet::new()),
                 config: self.config.clone(),
-                voice_manager: std::sync::Arc::new(serenity::prelude::Mutex::new(voice_manager)),
             };
 
             let mut client = match serenity::client::Client::builder(self.token.as_str()).event_handler(handler).await {
                 Ok(client) => client,
                 Err(error) => {
-                    eprintln!("Unable to connect to discord. Error: {}", error);
+                    rogu::error!("Unable to connect to discord. Error: {}", error);
                     continue;
                 }
             };
 
+            {
+                let mut data = client.data.write().await;
+                data.insert::<ShardManagerTag>(client.shard_manager.clone());
+            }
+
             loop {
                 if let Err(error) = client.start().await {
-                    eprintln!("Client failure. Error: {}", error);
+                    rogu::error!("Client failure. Error: {}", error);
+                } else {
+                    rogu::info!("Shutting down");
+                    return;
                 }
             }
         }
