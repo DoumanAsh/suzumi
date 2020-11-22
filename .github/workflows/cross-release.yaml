@@ -38,6 +38,7 @@ jobs:
       run: cross build --release --target ${{matrix.target}}
       env:
         RUSTFLAGS: '-C link-arg=-s'
+        LIBOPUS_STATIC: 1
 
     - name: Pack
       run: zip -j suzumi-${{matrix.target}}.zip target/${{matrix.target}}/release/suzumi
