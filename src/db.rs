@@ -126,3 +126,15 @@ impl Db {
         self.view.clone()
     }
 }
+
+impl Drop for Db {
+    fn drop(&mut self) {
+        if let Err(error) = self.view.user.flush() {
+            rogu::error!("Failed to flush user table: {}", error);
+        }
+
+        if let Err(error) = self.view.server.flush() {
+            rogu::error!("Failed to flush server table: {}", error);
+        }
+    }
+}
