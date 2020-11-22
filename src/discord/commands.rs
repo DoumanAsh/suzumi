@@ -6,6 +6,7 @@ use core::fmt;
 
 ///1h
 pub const ALLOWANCE_COOL_DOWN: u64 = 60 * 60;
+pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 mod err {
     pub mod discord {
@@ -67,7 +68,6 @@ impl super::Handler {
             Ok(user) => {
                 let result = ctx.msg.author.direct_message(&ctx, |m| {
                     m.embed(|m| {
-
                         let level = Level::new(user.exp);
                         m.title("Profile")
                          .field("Level", level.level, true)
@@ -165,6 +165,7 @@ impl super::Handler {
                     ctx.msg.author.direct_message(&ctx, |m| {
                         m.embed(|m| {
                             m.title("Config")
+                             .field("Version", VERSION, false)
                              .field("Welcome channel", server.welcome_ch, false)
                              .field("Music channel", server.music_ch, false)
                         })
