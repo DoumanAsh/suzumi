@@ -10,6 +10,7 @@ fn rust_main(args: c_ffi::Args) -> u8 {
         Err(code) => return code,
     };
 
+    //tracing_subscriber::fmt::init();
     #[cfg(debug_assertions)]
     rogu::set_level(rogu::Level::DEBUG);
     #[cfg(not(debug_assertions))]

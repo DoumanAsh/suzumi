@@ -54,6 +54,7 @@ impl DbView {
                 Ok(Some(result)) => {
                     let result: &[u8] = result.as_ref();
                     if result.len() != <T as data::Serialize>::SIZE {
+                        rogu::warn!("Schema break!");
                         //TODO: consider using format that would work just fine with extending it (e.g.  json)
                         //but these formats are overhead
                         break Ok(T::default())

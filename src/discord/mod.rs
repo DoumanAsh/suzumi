@@ -21,9 +21,15 @@ impl TypeMapKey for ShardManagerTag {
     type Value = std::sync::Arc<serenity::prelude::Mutex<ShardManager>>;
 }
 
+struct PlayerSendTag;
+impl TypeMapKey for PlayerSendTag {
+    type Value = player::PlayerSender;
+}
+
 mod utils;
 mod commands;
 mod emoji;
+mod player;
 
 #[derive(Clone)]
 pub struct Config {
@@ -138,11 +144,14 @@ impl Handler {
             HELP => self.handle_help(ctx).await,
             ROLL => self.handle_roll(ctx).await,
             JUDGE => self.handle_judge(ctx, split.collect()).await,
+            PLAYER => self.handle_player(ctx, split).await,
             WHOAMI => self.handle_whoami(ctx).await,
             ALLOWANCE => self.handle_allowance(ctx).await,
             SHUTDOWN => self.handle_shutdown(ctx).await,
             CONFIG => self.handle_config(ctx).await,
             SET_WELCOME => self.handle_set_welcome(ctx).await,
+            SET_VOICE => self.handle_set_voice(ctx).await,
+            SET_DEV => self.handle_set_dev(ctx).await,
             _ => ctx.msg.reply(ctx, "Sorry, I do not know such command").await.map(|_| ()),
         }
     }
@@ -201,10 +210,14 @@ impl Discord {
                 }
             };
 
+            let (player, sender) = player::MusicPlayer::new(self.state.db.clone(), client.voice_manager.clone());
             {
                 let mut data = client.data.write().await;
                 data.insert::<ShardManagerTag>(client.shard_manager.clone());
+                data.insert::<PlayerSendTag>(sender.clone());
             }
+
+            tokio::spawn(player.run());
 
             loop {
                 if let Err(error) = client.start().await {
@@ -214,6 +227,8 @@ impl Discord {
                     return;
                 }
             }
+
+            //let _ = sender.send(player::PlayerCommand::Shutdown).await;
         }
     }
 }

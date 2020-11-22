@@ -21,9 +21,12 @@ pub const ROLL: u64 = xxhash_rust::const_xxh3::xxh3_64(b"roll");
 pub const JUDGE: u64 = xxhash_rust::const_xxh3::xxh3_64(b"judge");
 pub const WHOAMI: u64 = xxhash_rust::const_xxh3::xxh3_64(b"whoami");
 pub const ALLOWANCE: u64 = xxhash_rust::const_xxh3::xxh3_64(b"allowance");
+pub const PLAYER: u64 = xxhash_rust::const_xxh3::xxh3_64(b"player");
 pub const SHUTDOWN: u64 = xxhash_rust::const_xxh3::xxh3_64(b"shutdown");
-pub const SET_WELCOME: u64 = xxhash_rust::const_xxh3::xxh3_64(b"set_welcome");
 pub const CONFIG: u64 = xxhash_rust::const_xxh3::xxh3_64(b"config");
+pub const SET_WELCOME: u64 = xxhash_rust::const_xxh3::xxh3_64(b"set_welcome");
+pub const SET_VOICE: u64 = xxhash_rust::const_xxh3::xxh3_64(b"set_voice");
+pub const SET_DEV: u64 = xxhash_rust::const_xxh3::xxh3_64(b"set_dev");
 
 //Normally you should prefer to return future, but most of commands are too complicated to avoid
 //type erasure, hence hope compiler is able to inline async
@@ -60,6 +63,79 @@ impl super::Handler {
         let choice = args[roll.roll() as usize - 1];
 
         ctx.msg.reply(&ctx, format!("The criminal is {}", choice)).await?;
+        Ok(())
+    }
+
+    #[inline]
+    pub async fn handle_player<'a, T: Iterator<Item=&'a str>>(&self, ctx: HandlerContext<'a>, mut args: T) -> serenity::Result<()> {
+        pub const START: u64 = xxhash_rust::const_xxh3::xxh3_64(b"start");
+        pub const STOP: u64 = xxhash_rust::const_xxh3::xxh3_64(b"stop");
+
+        let cmd = match args.next() {
+            Some(cmd) => cmd,
+            None => {
+                ctx.msg.reply(&ctx, "Player has following commands: start, stop").await?;
+                return Ok(())
+            },
+        };
+
+        let id = if let Some(id) = ctx.msg.guild_id.as_ref().map(|id| id.0) {
+            id
+        } else {
+            let _ = ctx.msg.react(&ctx, emoji::KINSHI).await;
+            return Ok(());
+        };
+
+        if !self.state.db.get::<data::Server>(id).map(|server| server.music_ch != 0).unwrap_or(false) {
+            ctx.msg.reply(&ctx, "Voice channel is not set yet, please do so.").await?;
+            return Ok(())
+        }
+
+        match xxhash_rust::xxh3::xxh3_64(cmd.as_bytes()) {
+            START => match args.next() {
+                Some(music) => match serenity::voice::ytdl(music).await {
+                    Ok(music) => {
+                        let mut data = ctx.serenity.data.write().await;
+                        if let Some(sender) = data.get_mut::<PlayerSendTag>() {
+                            if let Err(_) = sender.send(player::PlayerCommand::Play(id, music)).await {
+                                rogu::error!("Player unexpectedly stopped!");
+                            } else {
+                                let _ = ctx.msg.react(&ctx, emoji::OK).await;
+                                return Ok(());
+                            }
+                        }
+                        let _ = ctx.msg.react(&ctx, emoji::KINSHI).await;
+                    },
+                    Err(_) => {
+                        ctx.msg.reply(&ctx, "Cannot download it, is this a youtube link?").await?;
+                    },
+                },
+                None => {
+                    ctx.msg.reply(&ctx, "Play requires something to play, provide link to music").await?;
+                }
+            },
+            STOP => match ctx.is_mod {
+                true => {
+                    let mut data = ctx.serenity.data.write().await;
+                    if let Some(sender) = data.get_mut::<PlayerSendTag>() {
+                        if let Err(_) = sender.send(player::PlayerCommand::Stop(id)).await {
+                            rogu::error!("Player unexpectedly stopped!");
+                        } else {
+                            let _ = ctx.msg.react(&ctx, emoji::OK).await;
+                            return Ok(());
+                        }
+                    }
+                    let _ = ctx.msg.react(&ctx, emoji::KINSHI).await;
+                },
+                false => {
+                    let _ = ctx.msg.react(&ctx, emoji::KINSHI).await;
+                }
+            },
+            _ => {
+                ctx.msg.reply(&ctx, "Unknown command, allowed: start, stop").await?;
+            },
+        }
+
         Ok(())
     }
 
@@ -169,6 +245,7 @@ impl super::Handler {
                              .field("Version", VERSION, false)
                              .field("Welcome channel", server.welcome_ch, false)
                              .field("Music channel", server.music_ch, false)
+                             .field("Dev channel", server.dev_ch, false)
                         })
                     }).await?;
 
@@ -191,6 +268,11 @@ impl super::Handler {
                 manager.lock().await.shutdown_all().await;
                 return Ok(());
             }
+
+            let mut data = ctx.serenity.data.write().await;
+            if let Some(sender) = data.get_mut::<PlayerSendTag>() {
+                let _ = sender.send(player::PlayerCommand::Shutdown);
+            }
         }
 
         let _ = ctx.msg.react(&ctx, emoji::KINSHI).await;
@@ -203,6 +285,59 @@ impl super::Handler {
             if let Some(id) = ctx.msg.guild_id.as_ref().map(|id| id.0) {
                 if let Ok(mut server) = self.state.db.get::<data::Server>(id) {
                     server.welcome_ch = if server.welcome_ch == ctx.msg.channel_id.0 {
+                        0
+                    } else {
+                        ctx.msg.channel_id.0
+                    };
+
+                    let db = self.state.db.clone();
+                    let _ = tokio::task::spawn_blocking(move || db.put(id, &server)).await;
+
+                    let _ = ctx.msg.react(&ctx, emoji::OK).await;
+                    return Ok(())
+                }
+            }
+        }
+
+        let _ = ctx.msg.react(&ctx, emoji::KINSHI).await;
+        Ok(())
+    }
+
+    #[inline]
+    pub async fn handle_set_voice(&self, ctx: HandlerContext<'_>) -> serenity::Result<()> {
+        if ctx.is_mod {
+            if let Some(guild) = ctx.msg.guild(&ctx.serenity).await {
+                let server_id = guild.id.0;
+                if let Some(voice_ch) = guild.voice_states.get(&ctx.msg.author.id).and_then(|state| state.channel_id) {
+                    if let Ok(mut server) = self.state.db.get::<data::Server>(server_id) {
+                        server.music_ch = if server.music_ch == voice_ch.0 {
+                            0
+                        } else {
+                            voice_ch.0
+                        };
+
+                        let db = self.state.db.clone();
+                        let _ = tokio::task::spawn_blocking(move || db.put(server_id, &server)).await;
+
+                        let _ = ctx.msg.react(&ctx, emoji::OK).await;
+                        return Ok(())
+                    }
+                } else {
+                    let _ = ctx.msg.reply(&ctx, "You're not in any channel, please join one before using the command").await;
+                }
+            }
+        }
+
+        let _ = ctx.msg.react(&ctx, emoji::KINSHI).await;
+        Ok(())
+    }
+
+    #[inline]
+    pub async fn handle_set_dev(&self, ctx: HandlerContext<'_>) -> serenity::Result<()> {
+        if ctx.is_mod {
+            if let Some(id) = ctx.msg.guild_id.as_ref().map(|id| id.0) {
+                if let Ok(mut server) = self.state.db.get::<data::Server>(id) {
+                    server.dev_ch = if server.dev_ch == ctx.msg.channel_id.0 {
                         0
                     } else {
                         ctx.msg.channel_id.0

@@ -18,6 +18,7 @@ pub trait Deserialize: Serialize {
 pub struct Server {
     pub welcome_ch: u64,
     pub music_ch: u64,
+    pub dev_ch: u64,
 }
 
 impl Server {
@@ -26,6 +27,7 @@ impl Server {
         Self {
             welcome_ch: u64::from_le_bytes([data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]]),
             music_ch: u64::from_le_bytes([data[8], data[9], data[10], data[11], data[12], data[13], data[14], data[15]]),
+            dev_ch: u64::from_le_bytes([data[16], data[17], data[18], data[19], data[20], data[21], data[22], data[23]]),
         }
     }
 
@@ -33,6 +35,7 @@ impl Server {
     pub const fn to_bytes(&self) -> <Self as Serialize>::Output {
         let welcome_ch = self.welcome_ch.to_le_bytes();
         let music_ch = self.music_ch.to_le_bytes();
+        let dev_ch = self.dev_ch.to_le_bytes();
 
         [
             welcome_ch[0],
@@ -51,13 +54,21 @@ impl Server {
             music_ch[5],
             music_ch[6],
             music_ch[7],
+            dev_ch[0],
+            dev_ch[1],
+            dev_ch[2],
+            dev_ch[3],
+            dev_ch[4],
+            dev_ch[5],
+            dev_ch[6],
+            dev_ch[7],
         ]
     }
 }
 
 impl Serialize for Server {
-    const SIZE: usize = 16;
-    type Output = [u8; 16];
+    const SIZE: usize = 24;
+    type Output = [u8; 24];
 
     #[inline]
     fn serialize(&self) -> Self::Output {
