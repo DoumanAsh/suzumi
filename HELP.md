@@ -5,4 +5,5 @@ __General Commands__
 - `judge`     - Selects randomly among choices. Needs at least 2.
 - `player`    - Controls music player. Available commands: `start`, `stop`
 - `whoami`    - Shows user's information in DM.
+- `suggest`   - Ask to post a suggestion to developers. Costs 10 coins.
 - `allowance` - Ask for allowance. Can be executed once per day. Amount depends on level.
