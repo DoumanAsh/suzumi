@@ -1,5 +1,6 @@
 use super::*;
 use crate::game::Level;
+use crate::utils;
 
 use std::time;
 use core::fmt;
@@ -68,8 +69,9 @@ impl super::Handler {
 
     #[inline]
     pub async fn handle_player<'a, T: Iterator<Item=&'a str>>(&self, ctx: HandlerContext<'a>, mut args: T) -> serenity::Result<()> {
-        pub const START: u64 = xxhash_rust::const_xxh3::xxh3_64(b"start");
-        pub const STOP: u64 = xxhash_rust::const_xxh3::xxh3_64(b"stop");
+        const COST: u32 = 5;
+        const START: u64 = xxhash_rust::const_xxh3::xxh3_64(b"start");
+        const STOP: u64 = xxhash_rust::const_xxh3::xxh3_64(b"stop");
 
         let cmd = match args.next() {
             Some(cmd) => cmd,
@@ -93,22 +95,46 @@ impl super::Handler {
 
         match xxhash_rust::xxh3::xxh3_64(cmd.as_bytes()) {
             START => match args.next() {
-                Some(music) => match serenity::voice::ytdl(music).await {
-                    Ok(music) => {
-                        let mut data = ctx.serenity.data.write().await;
-                        if let Some(sender) = data.get_mut::<PlayerSendTag>() {
-                            if let Err(_) = sender.send(player::PlayerCommand::Play(id, music)).await {
-                                rogu::error!("Player unexpectedly stopped!");
-                            } else {
-                                let _ = ctx.msg.react(&ctx, emoji::OK).await;
-                                return Ok(());
-                            }
+                Some(music) => {
+                    let user_id = ctx.msg.author.id.0;
+                    let mut user = match self.state.db.get::<data::User>(user_id) {
+                        Ok(user) => user,
+                        Err(error) => {
+                            rogu::error!("Cannot retrieve user info: {}", error);
+                            ctx.msg.reply(&ctx, "Cannot access your wallet :(").await?;
+                            return Ok(())
                         }
-                        let _ = ctx.msg.react(&ctx, emoji::KINSHI).await;
-                    },
-                    Err(_) => {
-                        ctx.msg.reply(&ctx, "Cannot download it, is this a youtube link?").await?;
-                    },
+                    };
+
+                    if user.cash < COST {
+                        ctx.msg.reply(&ctx, "You do not have enough cash(5¥) for music :P").await?;
+                        return Ok(())
+                    }
+
+                    user.cash -= COST;
+
+                    let db = self.state.db.clone();
+                    let guard = utils::DropGuard::new(move || db.put(user_id, &user), utils::DropAsync);
+
+                    match serenity::voice::ytdl(music).await {
+                        Ok(music) => {
+                            let mut data = ctx.serenity.data.write().await;
+                            if let Some(sender) = data.get_mut::<PlayerSendTag>() {
+                                if let Err(_) = sender.send(player::PlayerCommand::Play(id, music)).await {
+                                    rogu::error!("Player unexpectedly stopped!");
+                                } else {
+                                    let _ = ctx.msg.react(&ctx, emoji::OK).await;
+                                    return Ok(());
+                                }
+                            }
+                            let _ = ctx.msg.react(&ctx, emoji::KINSHI).await;
+                        },
+                        Err(_) => {
+                            ctx.msg.reply(&ctx, "Cannot download it, is this a youtube link?").await?;
+                        },
+                    }
+
+                    guard.forget();
                 },
                 None => {
                     ctx.msg.reply(&ctx, "Play requires something to play, provide link to music").await?;
