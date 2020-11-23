@@ -145,6 +145,7 @@ impl Handler {
             ROLL => self.handle_roll(ctx).await,
             JUDGE => self.handle_judge(ctx, split.collect()).await,
             PLAYER => self.handle_player(ctx, split).await,
+            SUGGEST => self.handle_suggest(ctx).await,
             WHOAMI => self.handle_whoami(ctx).await,
             ALLOWANCE => self.handle_allowance(ctx).await,
             SHUTDOWN => self.handle_shutdown(ctx).await,

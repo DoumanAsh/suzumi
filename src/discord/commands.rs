@@ -23,6 +23,7 @@ pub const JUDGE: u64 = xxhash_rust::const_xxh3::xxh3_64(b"judge");
 pub const WHOAMI: u64 = xxhash_rust::const_xxh3::xxh3_64(b"whoami");
 pub const ALLOWANCE: u64 = xxhash_rust::const_xxh3::xxh3_64(b"allowance");
 pub const PLAYER: u64 = xxhash_rust::const_xxh3::xxh3_64(b"player");
+pub const SUGGEST: u64 = xxhash_rust::const_xxh3::xxh3_64(b"suggest");
 pub const SHUTDOWN: u64 = xxhash_rust::const_xxh3::xxh3_64(b"shutdown");
 pub const CONFIG: u64 = xxhash_rust::const_xxh3::xxh3_64(b"config");
 pub const SET_WELCOME: u64 = xxhash_rust::const_xxh3::xxh3_64(b"set_welcome");
@@ -160,6 +161,80 @@ impl super::Handler {
             _ => {
                 ctx.msg.reply(&ctx, "Unknown command, allowed: start, stop").await?;
             },
+        }
+
+        Ok(())
+    }
+
+    #[inline]
+    pub async fn handle_suggest(&self, ctx: HandlerContext<'_>) -> serenity::Result<()> {
+        const COST: u32 = 10;
+
+        let id = match ctx.msg.guild_id.as_ref().map(|id| id.0) {
+            Some(id) => id,
+            None => {
+                let _ = ctx.msg.react(&ctx, emoji::KINSHI).await;
+                return Ok(());
+            },
+        };
+
+        let channel = match self.state.db.get::<data::Server>(id) {
+            Ok(server) if server.dev_ch != 0 => ChannelId(server.dev_ch),
+            _ => {
+                ctx.msg.reply(&ctx, "Dev channel is not set yet, please ask mods.").await?;
+                return Ok(())
+            },
+        };
+
+        let user_id = ctx.msg.author.id.0;
+        let mut user = match self.state.db.get::<data::User>(user_id) {
+            Ok(user) => user,
+            Err(error) => {
+                rogu::error!("Cannot retrieve user info: {}", error);
+                ctx.msg.reply(&ctx, "Cannot access your wallet :(").await?;
+                return Ok(())
+            }
+        };
+
+        if user.cash < COST {
+            ctx.msg.reply(&ctx, "You do not have enough cash(10¥) to post suggestion").await?;
+            return Ok(())
+        }
+
+        user.cash -= COST;
+
+        let db = self.state.db.clone();
+        let guard = utils::DropGuard::new(move || db.put(user_id, &user), utils::DropAsync);
+
+        let suggestion = &ctx.msg.content[8..];
+        let mut author: serenity::builder::CreateEmbedAuthor = Default::default();
+        author.name(ctx.msg.author.name.as_str());
+        let user_image = if let Some(icon) = ctx.msg.author.avatar.as_ref() {
+            let user_image = format!("https://cdn.discordapp.com/avatars/{}/{}.png", ctx.msg.author.id.0, icon);
+            author.icon_url(&user_image);
+            Some(user_image)
+        } else {
+            None
+        };
+        let user_name = ctx.msg.author.name.as_str();
+
+        let result = channel.send_message(&ctx.serenity, move |msg| msg.embed(|m| {
+            if let Some(user_image) = user_image {
+                m.thumbnail(user_image);
+            }
+
+            m.title(format_args!("Suggestion from {}", user_name))
+             .set_author(author)
+             .description(suggestion)
+             .colour(serenity::utils::Colour::DARK_PURPLE)
+        })).await;
+
+        if let Err(error) = result {
+            rogu::error!("Failed to post suggestion: {}", error);
+            ctx.msg.reply(&ctx, "I'm sorry I cannot post your suggestion :(").await?;
+            guard.forget();
+        } else {
+            let _ = ctx.msg.react(&ctx, emoji::OK).await;
         }
 
         Ok(())
