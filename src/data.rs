@@ -19,6 +19,7 @@ pub struct Server {
     pub welcome_ch: u64,
     pub music_ch: u64,
     pub dev_ch: u64,
+    pub spam_ch: u64,
 }
 
 impl Server {
@@ -28,6 +29,7 @@ impl Server {
             welcome_ch: u64::from_le_bytes([data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]]),
             music_ch: u64::from_le_bytes([data[8], data[9], data[10], data[11], data[12], data[13], data[14], data[15]]),
             dev_ch: u64::from_le_bytes([data[16], data[17], data[18], data[19], data[20], data[21], data[22], data[23]]),
+            spam_ch: u64::from_le_bytes([data[24], data[25], data[26], data[27], data[28], data[29], data[30], data[31]]),
         }
     }
 
@@ -36,6 +38,7 @@ impl Server {
         let welcome_ch = self.welcome_ch.to_le_bytes();
         let music_ch = self.music_ch.to_le_bytes();
         let dev_ch = self.dev_ch.to_le_bytes();
+        let spam_ch = self.spam_ch.to_le_bytes();
 
         [
             welcome_ch[0],
@@ -62,13 +65,21 @@ impl Server {
             dev_ch[5],
             dev_ch[6],
             dev_ch[7],
+            spam_ch[0],
+            spam_ch[1],
+            spam_ch[2],
+            spam_ch[3],
+            spam_ch[4],
+            spam_ch[5],
+            spam_ch[6],
+            spam_ch[7],
         ]
     }
 }
 
 impl Serialize for Server {
-    const SIZE: usize = 24;
-    type Output = [u8; 24];
+    const SIZE: usize = 32;
+    type Output = [u8; 32];
 
     #[inline]
     fn serialize(&self) -> Self::Output {

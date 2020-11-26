@@ -29,6 +29,7 @@ pub const CONFIG: u64 = xxhash_rust::const_xxh3::xxh3_64(b"config");
 pub const SET_WELCOME: u64 = xxhash_rust::const_xxh3::xxh3_64(b"set_welcome");
 pub const SET_VOICE: u64 = xxhash_rust::const_xxh3::xxh3_64(b"set_voice");
 pub const SET_DEV: u64 = xxhash_rust::const_xxh3::xxh3_64(b"set_dev");
+pub const SET_SPAM: u64 = xxhash_rust::const_xxh3::xxh3_64(b"set_spam");
 
 //Normally you should prefer to return future, but most of commands are too complicated to avoid
 //type erasure, hence hope compiler is able to inline async
@@ -257,6 +258,8 @@ impl super::Handler {
 
                 if result.is_ok() {
                     let _ = ctx.msg.react(&ctx, emoji::OK).await;
+                } else {
+                    let _ = ctx.msg.react(&ctx, emoji::KINSHI).await;
                 }
                 result
             },
@@ -347,6 +350,7 @@ impl super::Handler {
                              .field("Welcome channel", server.welcome_ch, false)
                              .field("Music channel", server.music_ch, false)
                              .field("Dev channel", server.dev_ch, false)
+                             .field("Spam channel", server.spam_ch, false)
                         })
                     }).await?;
 
@@ -439,6 +443,30 @@ impl super::Handler {
             if let Some(id) = ctx.msg.guild_id.as_ref().map(|id| id.0) {
                 if let Ok(mut server) = self.state.db.get::<data::Server>(id) {
                     server.dev_ch = if server.dev_ch == ctx.msg.channel_id.0 {
+                        0
+                    } else {
+                        ctx.msg.channel_id.0
+                    };
+
+                    let db = self.state.db.clone();
+                    let _ = tokio::task::spawn_blocking(move || db.put(id, &server)).await;
+
+                    let _ = ctx.msg.react(&ctx, emoji::OK).await;
+                    return Ok(())
+                }
+            }
+        }
+
+        let _ = ctx.msg.react(&ctx, emoji::KINSHI).await;
+        Ok(())
+    }
+
+    #[inline]
+    pub async fn handle_set_spam(&self, ctx: HandlerContext<'_>) -> serenity::Result<()> {
+        if ctx.is_mod {
+            if let Some(id) = ctx.msg.guild_id.as_ref().map(|id| id.0) {
+                if let Ok(mut server) = self.state.db.get::<data::Server>(id) {
+                    server.spam_ch = if server.spam_ch == ctx.msg.channel_id.0 {
                         0
                     } else {
                         ctx.msg.channel_id.0

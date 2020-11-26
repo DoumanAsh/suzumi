@@ -97,12 +97,12 @@ impl Handler {
     }
 
     async fn handle_chat(&self, ctx: HandlerContext<'_>) -> serenity::Result<()> {
-        struct LevelUpCong(u8);
+        struct LevelUpCong(String, u8);
 
         impl fmt::Display for LevelUpCong {
             #[inline]
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "Congratulations on level up! Your new level is {}", self.0)
+                write!(f, "{} Congratulations on level up! Your new level is {}", self.0, self.1)
             }
         }
 
@@ -121,12 +121,32 @@ impl Handler {
             return Ok(())
         }
 
+
         user.exp = level.exp;
         let db = self.state.db.clone();
         let _ = tokio::task::spawn_blocking(move || db.put(id, &user)).await;
 
+        let server_id = match ctx.msg.guild_id {
+            Some(server) => server.0,
+            None => return Ok(()),
+        };
+
+        let server_info: data::Server = match self.state.db.get(server_id) {
+            Ok(server_info) => server_info,
+            Err(error) => {
+                rogu::error!("Unable to get server info: {}", error);
+                return Ok(());
+            }
+        };
+
+        if server_info.spam_ch == 0 {
+            return Ok(());
+        }
+
         if result == game::LevelAddResult::LevelUp {
-            ctx.msg.reply(ctx, LevelUpCong(level.level)).await.map(|_| ())
+            let author = ctx.msg.author.mention();
+            let level = LevelUpCong(author, level.level);
+            ChannelId(server_info.spam_ch).send_message(&ctx.serenity, |msg| msg.content(level)).await.map(|_| ())
         } else {
             Ok(())
         }
@@ -153,6 +173,7 @@ impl Handler {
             SET_WELCOME => self.handle_set_welcome(ctx).await,
             SET_VOICE => self.handle_set_voice(ctx).await,
             SET_DEV => self.handle_set_dev(ctx).await,
+            SET_SPAM => self.handle_set_spam(ctx).await,
             _ => ctx.msg.reply(ctx, "Sorry, I do not know such command").await.map(|_| ()),
         }
     }
