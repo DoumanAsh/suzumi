@@ -266,22 +266,23 @@ impl serenity::client::EventHandler for Handler {
         let content = msg.content.trim();
 
         let result = if msg.guild_id.is_none() {
+            let trimmed_cmd = content.trim_start_matches(self.config.prefix);
             //Handle only commands in DM
-            if !content.starts_with(self.config.prefix) {
+            if content.len() - trimmed_cmd.len() != 1 {
                 return;
             }
-
-            let content = content.trim_start_matches(self.config.prefix);
 
             let context = HandlerContext {
                 serenity: &ctx,
                 msg: &msg,
-                text: content,
+                text: trimmed_cmd,
                 is_mod: false,
             };
             self.handle_cmd(context).await
         } else {
-            if !content.starts_with(self.config.prefix) {
+            let trimmed_cmd = content.trim_start_matches(self.config.prefix);
+
+            if content.len() - trimmed_cmd.len() != 1 {
                 let context = HandlerContext {
                     serenity: &ctx,
                     msg: &msg,
@@ -291,8 +292,6 @@ impl serenity::client::EventHandler for Handler {
                 };
                 self.handle_chat(context).await
             } else {
-                let content = content.trim_start_matches(self.config.prefix);
-
                 let is_mod = match msg.member(&ctx.http).await {
                     Ok(member) => self.is_moderator(&member.roles).await,
                     Err(error) => {
@@ -305,7 +304,7 @@ impl serenity::client::EventHandler for Handler {
                 let context = HandlerContext {
                     serenity: &ctx,
                     msg: &msg,
-                    text: content,
+                    text: trimmed_cmd,
                     is_mod,
                 };
                 self.handle_cmd(context).await
