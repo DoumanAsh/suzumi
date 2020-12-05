@@ -2,7 +2,7 @@ use serenity::async_trait; //they use this cancer :(
 use serenity::client::Context;
 use serenity::model::misc::Mentionable;
 use serenity::prelude::{TypeMapKey};
-use serenity::client::bridge::gateway::{ShardManager, GatewayIntents};
+use serenity::client::bridge::gateway::{ShardManager};
 use serenity::model::prelude::{Ready, Message, Guild, GuildUnavailable, GuildId, Member, ChannelId, PartialGuild, RoleId, Role};
 
 use crate::{game, data};
@@ -224,7 +224,7 @@ impl Discord {
                 config: self.config.clone(),
             };
 
-            let client = serenity::client::Client::builder(self.token.as_str()).add_intent(GatewayIntents::GUILD_MEMBERS);
+            let client = serenity::client::Client::builder(self.token.as_str());
 
             let mut client = match client.event_handler(handler).await {
                 Ok(client) => client,
