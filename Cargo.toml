@@ -57,3 +57,8 @@ features = ["no_logs", "no_metrics"]
 lto = true
 opt-level = "z"
 codegen-units = 1
+
+#replace serenity's opus with proper bindings
+[patch.crates-io.audiopus]
+git = "https://github.com/DoumanAsh/audiopus"
+branch = "better_sys"
