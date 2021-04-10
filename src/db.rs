@@ -104,7 +104,7 @@ pub struct Db {
 }
 
 impl Db {
-    pub fn open(path: &str) -> Result<Self, sled::Error> {
+    pub fn open<T: AsRef<std::path::Path>>(path: T) -> Result<Self, sled::Error> {
         let db = sled::Config::new().path(path)
                                     .cache_capacity(128_000)
                                     .mode(sled::Mode::LowSpace)

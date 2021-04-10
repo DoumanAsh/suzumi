@@ -25,6 +25,7 @@ pub const ALLOWANCE: u64 = xxhash_rust::const_xxh3::xxh3_64(b"allowance");
 pub const PLAYER: u64 = xxhash_rust::const_xxh3::xxh3_64(b"player");
 pub const SUGGEST: u64 = xxhash_rust::const_xxh3::xxh3_64(b"suggest");
 pub const SHUTDOWN: u64 = xxhash_rust::const_xxh3::xxh3_64(b"shutdown");
+pub const RESTART: u64 = xxhash_rust::const_xxh3::xxh3_64(b"restart");
 pub const CONFIG: u64 = xxhash_rust::const_xxh3::xxh3_64(b"config");
 pub const SET_WELCOME: u64 = xxhash_rust::const_xxh3::xxh3_64(b"set_welcome");
 pub const SET_VOICE: u64 = xxhash_rust::const_xxh3::xxh3_64(b"set_voice");
@@ -365,6 +366,26 @@ impl super::Handler {
     }
 
     #[inline]
+    pub async fn handle_restart(&self, ctx: HandlerContext<'_>) -> serenity::Result<()> {
+        if ctx.is_mod {
+            let data = ctx.serenity.data.read().await;
+            if let Some(manager) = data.get::<ShardManagerTag>() {
+                let _ = ctx.msg.react(&ctx, emoji::OK).await;
+                manager.lock().await.shutdown_all().await;
+                return Ok(());
+            }
+
+            let mut data = ctx.serenity.data.write().await;
+            if let Some(sender) = data.get_mut::<PlayerSendTag>() {
+                let _ = sender.send(player::PlayerCommand::Shutdown);
+            }
+        }
+
+        let _ = ctx.msg.react(&ctx, emoji::KINSHI).await;
+        Ok(())
+    }
+
+    #[inline]
     pub async fn handle_shutdown(&self, ctx: HandlerContext<'_>) -> serenity::Result<()> {
         if ctx.is_mod {
             let data = ctx.serenity.data.read().await;
@@ -378,6 +399,8 @@ impl super::Handler {
             if let Some(sender) = data.get_mut::<PlayerSendTag>() {
                 let _ = sender.send(player::PlayerCommand::Shutdown);
             }
+
+            crate::IS_SHUTDOWN.store(true, core::sync::atomic::Ordering::Release);
         }
 
         let _ = ctx.msg.react(&ctx, emoji::KINSHI).await;

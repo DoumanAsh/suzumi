@@ -18,7 +18,38 @@ fn rust_main(args: c_ffi::Args) -> u8 {
     #[cfg(not(debug_assertions))]
     rogu::set_level(rogu::Level::INFO);
 
-    let db = match db::Db::open("suzumi-db") {
+    let mut db_dir = match std::env::current_exe() {
+        Ok(mut dir) => {
+            dir.pop();
+            dir
+        },
+        Err(err) => {
+            rogu::warn!("Cannot access executable directory: {}", err);
+            std::path::PathBuf::new()
+        },
+    };
+
+    db_dir.push("suzumi-db");
+
+    loop {
+        match run(args.clone(), &db_dir) {
+            0 => match IS_SHUTDOWN.load(Ordering::Acquire) {
+                true => {
+                    rogu::info!("Shutting down...");
+                    break 0;
+                },
+                false => rogu::info!("Restarting..."),
+            },
+            error => {
+                rogu::error!("Failed with error: {}", error);
+                break error;
+            }
+        }
+    }
+}
+
+fn run(args: cli::Cli, db: &std::path::Path) -> u8 {
+    let db = match db::Db::open(db) {
         Ok(db) => db,
         Err(error) => {
             eprintln!("Unable to open database: {}", error);

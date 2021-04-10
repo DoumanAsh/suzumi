@@ -4,7 +4,7 @@ use core::str::FromStr;
 
 pub type TokenStr = str_buf::StrBuf<[u8; 59]>;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[repr(transparent)]
 pub struct Token(pub TokenStr);
 
@@ -21,7 +21,7 @@ impl FromStr for Token {
     }
 }
 
-#[derive(Args, Debug)]
+#[derive(Args, Debug, Clone)]
 ///Find files utility
 pub struct Cli {
     #[arg(long, short, required)]

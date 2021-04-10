@@ -169,6 +169,7 @@ impl Handler {
             WHOAMI => self.handle_whoami(ctx).await,
             ALLOWANCE => self.handle_allowance(ctx).await,
             SHUTDOWN => self.handle_shutdown(ctx).await,
+            RESTART => self.handle_restart(ctx).await,
             CONFIG => self.handle_config(ctx).await,
             SET_WELCOME => self.handle_set_welcome(ctx).await,
             SET_VOICE => self.handle_set_voice(ctx).await,
@@ -216,8 +217,6 @@ impl Discord {
 
     pub async fn start(self) {
         loop {
-            //let voice_manager = serenity::client::bridge::voice::ClientVoiceManager::new(1, self.state.info.id.into());
-
             let handler = Handler {
                 state: self.state.clone(),
                 mods: tokio::sync::RwLock::new(HashSet::new()),
@@ -255,7 +254,6 @@ impl Discord {
                 }
             }
 
-            //let _ = sender.send(player::PlayerCommand::Shutdown).await;
         }
     }
 }
