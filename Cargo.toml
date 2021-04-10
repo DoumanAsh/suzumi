@@ -1,6 +1,6 @@
 [package]
 name = "suzumi"
-version = "1.0.6"
+version = "1.0.7"
 authors = ["Douman <douman@gmx.se>"]
 edition = "2018"
 publish = false
@@ -25,14 +25,19 @@ features = ["std", "release_level_info_off", "release_level_debug_off", "release
 
 # discord
 [dependencies.serenity]
-version = "0.9"
+version = "0.10"
 default-features = false
 features = ["builder", "client", "model", "rustls_backend", "http", "gateway", "cache", "voice"]
 
-[dependencies.tokio]
-version = "0.2"
+[dependencies.songbird]
+version = "0.1.5"
 default-features = false
-features = ["rt-core", "io-driver", "macros"]
+features = ["driver", "serenity-rustls"]
+
+[dependencies.tokio]
+version = "1"
+default-features = false
+features = ["rt", "net", "macros"]
 
 # Image processing
 [dependencies.rusttype]

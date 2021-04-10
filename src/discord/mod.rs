@@ -145,7 +145,7 @@ impl Handler {
 
         if result == game::LevelAddResult::LevelUp {
             let author = ctx.msg.author.mention();
-            let level = LevelUpCong(author, level.level);
+            let level = LevelUpCong(author.to_string(), level.level);
             ChannelId(server_info.spam_ch).send_message(&ctx.serenity, |msg| msg.content(level)).await.map(|_| ())
         } else {
             Ok(())
@@ -226,6 +226,9 @@ impl Discord {
 
             let client = serenity::client::Client::builder(self.token.as_str());
 
+            let voice_manager = songbird::Songbird::serenity();
+            let client = songbird::serenity::register_with(client, voice_manager.clone());
+
             let mut client = match client.event_handler(handler).await {
                 Ok(client) => client,
                 Err(error) => {
@@ -234,7 +237,7 @@ impl Discord {
                 }
             };
 
-            let (player, sender) = player::MusicPlayer::new(self.state.db.clone(), client.voice_manager.clone());
+            let (player, sender) = player::MusicPlayer::new(self.state.db.clone(), voice_manager);
             {
                 let mut data = client.data.write().await;
                 data.insert::<ShardManagerTag>(client.shard_manager.clone());
@@ -377,7 +380,7 @@ impl serenity::client::EventHandler for Handler {
                     filename: "welcome.png".to_owned(),
                 };
 
-                welcome_ch.send_files(&ctx.http, Some(attach), |msg| msg.content("Welcome")).await
+                welcome_ch.send_files(&ctx.http, Some(attach), |msg| msg.content(format_args!("{}", mention))).await
             },
             None => welcome_ch.send_message(&ctx.http, |msg| {
                 msg.content(format_args!("{}: Welcome to the server!", mention))

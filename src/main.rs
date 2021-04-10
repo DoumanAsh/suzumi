@@ -26,7 +26,7 @@ fn rust_main(args: c_ffi::Args) -> u8 {
 
     let assets = assets::Assets::new();
 
-    let mut rt = match tokio::runtime::Builder::new().basic_scheduler().enable_io().enable_time().max_threads(8).build() {
+    let rt = match tokio::runtime::Builder::new_current_thread().enable_io().enable_time().worker_threads(8).build() {
         Ok(rt) => rt,
         Err(error) => {
             eprintln!("Unable to start IO loop: {}", error);

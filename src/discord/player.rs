@@ -1,70 +1,67 @@
 use super::*;
 
-use serenity::voice::AudioSource;
-use serenity::client::bridge::voice::ClientVoiceManager;
+use songbird::Songbird;
+use songbird::input::Input as Audio;
 use tokio::sync::mpsc;
 
 use std::sync::Arc;
 
 pub type PlayerSender = mpsc::Sender<PlayerCommand>;
 
+pub struct OnTrackFinished(PlayerSender);
+
+#[serenity::async_trait]
+impl songbird::events::EventHandler for OnTrackFinished {
+    async fn act(&self, _: &songbird::events::EventContext<'_>) -> Option<songbird::events::Event> {
+        let _ = self.0.send(PlayerCommand::TrackFinished).await;
+        None
+    }
+}
+
 pub enum PlayerCommand {
-    Play(u64, Box<dyn AudioSource>),
+    Play(u64, Audio),
     Stop(u64),
+    TrackFinished,
     Shutdown,
 }
 
 pub struct MusicPlayer {
     db: DbView,
-    voice_manager: Arc<serenity::prelude::Mutex<ClientVoiceManager>>,
+    voice_manager: Arc<Songbird>,
+    sender: mpsc::Sender<PlayerCommand>,
     receiver: mpsc::Receiver<PlayerCommand>,
 }
 
 impl MusicPlayer {
-    pub fn new(db: DbView, voice_manager: Arc<serenity::prelude::Mutex<ClientVoiceManager>>) -> (Self, PlayerSender) {
+    pub fn new(db: DbView, voice_manager: Arc<Songbird>) -> (Self, PlayerSender) {
         let (sender, receiver) = tokio::sync::mpsc::channel(64);
 
         (Self {
             db,
             voice_manager,
+            sender: sender.clone(),
             receiver,
         }, sender)
     }
 
     pub async fn run(mut self) {
         //Reference to currently playing.
-        let mut ongoing: Option<serenity::voice::LockedAudio> = None;
+        let mut ongoing: Option<(u64, songbird::tracks::TrackHandle)> = None;
         //Back-log to play.
         let mut list = std::collections::VecDeque::new();
 
         loop {
-            let cmd = match self.receiver.try_recv() {
-                Ok(cmd) => cmd,
-                Err(tokio::sync::mpsc::error::TryRecvError::Empty) => match list.pop_front() {
-                    Some((server_id, audio)) => PlayerCommand::Play(server_id, audio),
-                    None => match self.receiver.recv().await {
-                        Some(cmd) => cmd,
-                        //Senders are dead
-                        None => return,
-                    }
-                },
-                Err(tokio::sync::mpsc::error::TryRecvError::Closed) => return,
+            let cmd = match self.receiver.recv().await {
+                Some(cmd) => cmd,
+                None => break,
             };
 
             match cmd {
                 PlayerCommand::Play(server_id, audio) => {
-                    let is_ongoing = match ongoing.as_ref() {
-                        Some(audio) => {
-                            let audio = audio.lock().await;
-                            !audio.finished || audio.playing
-                        },
-                        None => false,
-                    };
-
-                    if is_ongoing {
+                    if ongoing.is_some() {
                         list.push_back((server_id, audio));
                     } else {
-                        ongoing = None;
+                        rogu::debug!("Start new track on server={}", server_id);
                         let channel_id = loop {
                             match self.db.get::<data::Server>(server_id) {
                                 Ok(server) => break server.music_ch,
@@ -74,29 +71,67 @@ impl MusicPlayer {
                             }
                         };
 
-                        if let Some(handler) = self.voice_manager.lock().await.join(server_id, channel_id) {
-                            handler.deafen(true);
-                            ongoing = Some(handler.play_returning(audio));
-                        } else {
-                            rogu::error!("Unable to join voice channel");
-                        }
+                        let track = match self.voice_manager.join(server_id, channel_id).await {
+                            (handler, Ok(_)) => {
+                                let mut handler = handler.lock().await;
+                                if !handler.is_deaf() {
+                                    let _ = handler.deafen(true).await;
+                                }
+                                handler.play_source(audio)
+                            },
+                            (_, Err(error)) => {
+                                rogu::error!("Unable to join voice channel: {}", error);
+                                continue;
+                            },
+                        };
+
+                        let end_event = songbird::events::Event::Track(songbird::events::TrackEvent::End);
+                        let _ = track.add_event(end_event, OnTrackFinished(self.sender.clone()));
+
+                        ongoing = Some((server_id, track));
                     }
                 },
                 PlayerCommand::Stop(server_id) => {
-                    let mut voice_manager = self.voice_manager.lock().await;
-                    if let Some(handler) = voice_manager.get_mut(server_id) {
-                        handler.stop();
+                    if let Some((_, ongoing)) = ongoing.take() {
+                        if let Err(error) = ongoing.stop() {
+                            rogu::warn!("Failed to stop ongoing track: {}", error);
+                        }
+
+                        match self.voice_manager.remove(server_id).await {
+                            Ok(_) => {
+                                rogu::debug!("Left voice channel");
+                            },
+                            Err(error) => {
+                                rogu::warn!("No voice manager for server {}, cannot leave voice channel: {}", server_id, error);
+                            },
+                        }
                     }
 
-                    ongoing = None;
+                    if let Some((server_id, audio)) = list.pop_front() {
+                        if let Err(error) = self.sender.send(PlayerCommand::Play(server_id, audio)).await {
+                            rogu::warn!("Failed to send new player command: {}", error);
+                        }
+                    }
+                },
+                PlayerCommand::TrackFinished => {
+                    rogu::debug!("Track has been finished");
+                    if let Some((server_id, _)) = ongoing.take() {
+                        //TODO: Workaround for this buggy piece of shit that deadlocks when you
+                        //join the same channel
+                        match self.voice_manager.remove(server_id).await {
+                            Ok(_) => {
+                                rogu::debug!("Left voice channel");
+                            },
+                            Err(error) => {
+                                rogu::warn!("No voice manager for server {}, cannot leave voice channel: {}", server_id, error);
+                            },
+                        }
 
-                    match voice_manager.leave(server_id) {
-                        Some(_) => {
-                            rogu::debug!("Left voice channel");
-                        },
-                        None => {
-                            rogu::warn!("No voice manager for server {}, cannot leave  voice channel", server_id);
-                        },
+                        if let Some((server_id, audio)) = list.pop_front() {
+                            if let Err(error) = self.sender.send(PlayerCommand::Play(server_id, audio)).await {
+                                rogu::warn!("Failed to send new player command: {}", error);
+                            }
+                        }
                     }
                 },
                 PlayerCommand::Shutdown => break,

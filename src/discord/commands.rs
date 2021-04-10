@@ -118,7 +118,7 @@ impl super::Handler {
                     let db = self.state.db.clone();
                     let guard = utils::DropGuard::new(move || db.put(user_id, &user), utils::DropAsync);
 
-                    match serenity::voice::ytdl(music).await {
+                    match songbird::ytdl(music).await {
                         Ok(music) => {
                             let mut data = ctx.serenity.data.write().await;
                             if let Some(sender) = data.get_mut::<PlayerSendTag>() {
