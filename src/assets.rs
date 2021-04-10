@@ -68,7 +68,7 @@ impl Assets {
         let name = name.trim_matches(|ch| self.font.welcome.glyph(ch).id().0 == 0);
         let name = name.replace(|ch| self.font.welcome.glyph(ch).id().0 == 0, " ");
         let name = name.as_str();
-        if name.len() == 0 {
+        if name.is_empty() {
             return None;
         }
 

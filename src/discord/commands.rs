@@ -7,7 +7,7 @@ use core::fmt;
 
 ///1h
 pub const ALLOWANCE_COOL_DOWN: u64 = 60 * 60;
-pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 mod err {
     pub mod discord {
@@ -122,8 +122,8 @@ impl super::Handler {
                         Ok(music) => {
                             let mut data = ctx.serenity.data.write().await;
                             if let Some(sender) = data.get_mut::<PlayerSendTag>() {
-                                if let Err(_) = sender.send(player::PlayerCommand::Play(id, music)).await {
-                                    rogu::error!("Player unexpectedly stopped!");
+                                if let Err(error) = sender.send(player::PlayerCommand::Play(id, music)).await {
+                                    rogu::error!("Player unexpectedly stopped: {}", error);
                                 } else {
                                     let _ = ctx.msg.react(&ctx, emoji::OK).await;
                                     return Ok(());
@@ -146,8 +146,8 @@ impl super::Handler {
                 true => {
                     let mut data = ctx.serenity.data.write().await;
                     if let Some(sender) = data.get_mut::<PlayerSendTag>() {
-                        if let Err(_) = sender.send(player::PlayerCommand::Stop(id)).await {
-                            rogu::error!("Player unexpectedly stopped!");
+                        if let Err(error) = sender.send(player::PlayerCommand::Stop(id)).await {
+                            rogu::error!("Player unexpectedly stopped: {}", error);
                         } else {
                             let _ = ctx.msg.react(&ctx, emoji::OK).await;
                             return Ok(());

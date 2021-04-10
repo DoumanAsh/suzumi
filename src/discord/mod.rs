@@ -85,7 +85,7 @@ impl Handler {
         }
     }
 
-    async fn is_moderator(&self, roles: &Vec<RoleId>) -> bool {
+    async fn is_moderator(&self, roles: &[RoleId]) -> bool {
         let mods = self.mods.read().await;
         for role in roles {
             if mods.contains(&role.0) {

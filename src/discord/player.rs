@@ -50,12 +50,7 @@ impl MusicPlayer {
         //Back-log to play.
         let mut list = std::collections::VecDeque::new();
 
-        loop {
-            let cmd = match self.receiver.recv().await {
-                Some(cmd) => cmd,
-                None => break,
-            };
-
+        while let Some(cmd) = self.receiver.recv().await {
             match cmd {
                 PlayerCommand::Play(server_id, audio) => {
                     if ongoing.is_some() {

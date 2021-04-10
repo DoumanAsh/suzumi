@@ -1,3 +1,5 @@
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::style))]
+
 #![no_main]
 
 use suzumi::*;

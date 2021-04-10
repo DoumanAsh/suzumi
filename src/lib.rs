@@ -1,3 +1,5 @@
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::style))]
+
 #[macro_use]
 pub mod utils;
 pub mod cli;
