@@ -10,6 +10,8 @@ pub mod assets;
 pub mod db;
 pub mod game;
 pub mod discord;
+mod pinger;
+pub use pinger::Pinger;
 
 pub static IS_SHUTDOWN: AtomicBool = AtomicBool::new(false);
 
