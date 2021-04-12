@@ -38,11 +38,13 @@ fn rust_main(args: c_ffi::Args) -> u8 {
                     rogu::info!("Shutting down...");
                     break 0;
                 },
-                false => rogu::info!("Restarting..."),
+                false => {
+                    rogu::info!("Restarting...");
+                },
             },
             error => {
                 rogu::error!("Failed with error: {}", error);
-                break error;
+                std::thread::sleep(core::time::Duration::from_secs(10));
             }
         }
     }

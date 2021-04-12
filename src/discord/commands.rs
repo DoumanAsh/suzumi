@@ -392,7 +392,7 @@ impl super::Handler {
             if let Some(manager) = data.get::<ShardManagerTag>() {
                 let _ = ctx.msg.react(&ctx, emoji::OK).await;
                 manager.lock().await.shutdown_all().await;
-                return Ok(());
+                crate::IS_SHUTDOWN.store(true, core::sync::atomic::Ordering::Release);
             }
 
             let mut data = ctx.serenity.data.write().await;
@@ -400,7 +400,7 @@ impl super::Handler {
                 let _ = sender.send(player::PlayerCommand::Shutdown);
             }
 
-            crate::IS_SHUTDOWN.store(true, core::sync::atomic::Ordering::Release);
+            return Ok(());
         }
 
         let _ = ctx.msg.react(&ctx, emoji::KINSHI).await;
