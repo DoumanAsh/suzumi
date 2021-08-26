@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 arg = "0.3"
 c-ffi = "0.4"
-str-buf = "1"
+str-buf = "2"
 cute-dnd-dice = "4"
 
 # retarded logging
@@ -30,7 +30,7 @@ default-features = false
 features = ["builder", "client", "model", "rustls_backend", "http", "gateway", "cache", "voice"]
 
 [dependencies.songbird]
-version = "0.1.5"
+version = "0.2.0"
 default-features = false
 features = ["driver", "serenity-rustls"]
 

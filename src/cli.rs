@@ -2,7 +2,7 @@ use arg::Args;
 
 use core::str::FromStr;
 
-pub type TokenStr = str_buf::StrBuf<[u8; 59]>;
+pub type TokenStr = str_buf::StrBuf<59>;
 
 #[derive(Clone, Debug)]
 #[repr(transparent)]
